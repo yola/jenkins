@@ -1,10 +1,10 @@
 name             'jenkins'
 maintainer       'Chef Software, Inc.'
-maintainer_email 'releng@getchef.com'
+maintainer_email 'releng@chef.io'
 license          'Apache 2.0'
 description      'Installs and configures Jenkins CI master & slaves'
 long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
-version          '2.0.3'
+version          '2.2.2'
 
 recipe 'master', 'Installs a Jenkins master'
 

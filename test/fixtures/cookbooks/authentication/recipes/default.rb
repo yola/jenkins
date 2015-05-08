@@ -15,15 +15,13 @@ key = OpenSSL::PKey::RSA.new(jenkins['private_key'])
 private_key = key.to_pem
 public_key  = "#{key.ssh_type} #{[key.to_blob].pack('m0')}"
 
+# Set the private key on the executor
+node.run_state[:jenkins_private_key] = private_key
+
 # Create a default Chef user with the public key
 jenkins_user 'chef' do
   full_name   'Chef Client'
   public_keys [public_key]
-end
-
-# Set the private key on the executor
-ruby_block 'set the private key' do
-  block { node.set['jenkins']['executor']['private_key'] = private_key }
 end
 
 # Turn on basic authentication

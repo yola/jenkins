@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # HWRP:: jnlp_slave
 #
-# Author:: Seth Chisamore <schisamo@getchef.com>
+# Author:: Seth Chisamore <schisamo@chef.io>
 #
 # Copyright 2013-2014, Chef Software, Inc.
 #
@@ -19,50 +19,29 @@
 # limitations under the License.
 #
 
-require 'uri'
+require_relative '_params_validate'
 require_relative 'slave'
 
 class Chef
   class Resource::JenkinsJNLPSlave < Resource::JenkinsSlave
+    # Chef attributes
     provides :jenkins_jnlp_slave
 
-    def initialize(name, run_context = nil)
-      super
+    # Set the resource name
+    self.resource_name = :jenkins_jnlp_slave
 
-      # Set the resource name and provider
-      @resource_name = :jenkins_jnlp_slave
-      @provider = Provider::JenkinsJNLPSlave
+    # Actions
+    actions :create, :delete, :connect, :disconnect, :online, :offline
+    default_action :create
 
-      # Set the default attributes
-      @group           = 'jenkins'
-      @service_name    = 'jenkins-slave'
-    end
-
-    #
-    # Group slave prcess runs as. On *nix systems the group will be
-    # created if it does not exist.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def group(arg = nil)
-      set_or_return(
-        :group,
-        arg,
-        kind_of: String,
-        regex: Chef::Config[:group_valid_regex],
-      )
-    end
-
-    #
-    # Name of the service that manages the slave process.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def service_name(arg = nil)
-      set_or_return(:service_name, arg, kind_of: String)
-    end
+    # Attributes
+    attribute :group,
+      kind_of: String,
+      default: 'jenkins',
+      regex: Config[:group_valid_regex]
+    attribute :service_name,
+      kind_of: String,
+      default: 'jenkins-slave'
   end
 end
 
@@ -70,33 +49,25 @@ class Chef
   class Provider::JenkinsJNLPSlave < Provider::JenkinsSlave
     def load_current_resource
       @current_resource ||= Resource::JenkinsJNLPSlave.new(new_resource.name)
-
       super
     end
 
-    #
-    # @see Chef::Resource::JenkinsSlave#action_create
-    #
     def action_create
       super
-
-      parent_remote_fs_dir_resource.run_action(:create)
-
-      # don't create user/group on Windows
+    
       unless Chef::Platform.windows?
+        parent_remote_fs_dir_resource.run_action(:create)    
         group_resource.run_action(:create)
         user_resource.run_action(:create)
+       
+
+        remote_fs_dir_resource.run_action(:create)
+        slave_jar_resource.run_action(:create)
+
+        service_resource.run_action(:enable)
       end
-
-      remote_fs_dir_resource.run_action(:create)
-      slave_jar_resource.run_action(:create)
-
-      service_resource.run_action(:enable) unless Chef::Platform.windows?
     end
 
-    #
-    # @see Chef::Resource::JenkinsSlave#action_delete
-    #
     def action_delete
       # Stop and remove the service
       service_resource.run_action(:disable)
@@ -158,7 +129,7 @@ class Chef
     # @return [String]
     #
     def slave_jar
-      ::File.join(Chef::Config[:file_cache_path], 'slave.jar')
+      ::File.join(new_resource.remote_fs, 'slave.jar')
     end
 
     # Embedded Resources
@@ -237,6 +208,8 @@ class Chef
       @slave_jar_resource.source(slave_jar_url)
       @slave_jar_resource.backup(false)
       @slave_jar_resource.mode('0755')
+      @slave_jar_resource.atomic_update(false)
+      @slave_jar_resource.notifies(:restart, service_resource)
       @slave_jar_resource
     end
 
@@ -270,3 +243,8 @@ class Chef
     end
   end
 end
+
+Chef::Platform.set(
+  resource: :jenkins_jnlp_slave,
+  provider: Chef::Provider::JenkinsJNLPSlave
+)
