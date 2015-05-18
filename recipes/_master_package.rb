@@ -26,7 +26,7 @@ when 'debian'
   include_recipe 'apt::default'
 
   apt_repository 'jenkins' do
-    uri          'http://apt-mirrors.yola.net/jenkins'
+    uri          'http://pkg.jenkins-ci.org/debian'
     distribution 'binary/'
     key          '150FDE3F7787E7D11EF4E12A9B7D32F2D50582E6'
     keyserver    'pool.sks-keyservers.net'
