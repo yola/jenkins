@@ -20,7 +20,6 @@
 #
 
 require_relative 'credentials'
-require_relative '_params_validate'
 
 class Chef
   class Resource::JenkinsPrivateKeyCredentials < Resource::JenkinsCredentials
@@ -37,11 +36,15 @@ class Chef
     default_action :create
 
     # Attributes
+    attribute :id,
+              kind_of: String,
+              regex: UUID_REGEX, # Private Key credentials must still have a UUID based ID
+              default: lazy { SecureRandom.uuid }
     attribute :private_key,
-      kind_of: [String, OpenSSL::PKey::RSA],
-      required: true
+              kind_of: [String, OpenSSL::PKey::RSA],
+              required: true
     attribute :passphrase,
-      kind_of: String
+              kind_of: String
 
     #
     # Private key of the credentials . This should be the actual key
@@ -128,5 +131,5 @@ end
 
 Chef::Platform.set(
   resource: :jenkins_private_key_credentials,
-  provider: Chef::Provider::JenkinsPrivateKeyCredentials
+  provider: Chef::Provider::JenkinsPrivateKeyCredentials,
 )

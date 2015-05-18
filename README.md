@@ -94,11 +94,11 @@ end
 ```
 
 ### jenkins_credentials
-**NOTE** The use of the Jenkins credentials resource requries the Jenkins credentials plugin. This plugin began shipping with Jenkins 1.536. On older Jenkins installations, you will need to install the credentials plugin at version 1.5 or higher to utilize this resource. On newer versions of Jenkins, this resource should work correctly.
+**NOTE** The use of the Jenkins credentials resource requries the Jenkins credentials plugin. This plugin began shipping with Jenkins 1.536. On older Jenkins installations, you will need to install the credentials plugin at version 1.6 or higher to utilize this resource. On newer versions of Jenkins, this resource should work correctly.
 
-Each credential can be referenced in job by its UUID.
-You can set this UUID when creating credential, and set the same UUID in job configuration.
-To generate UUID, you can use linux command `uuidgen`.
+Each credential can be referenced in job by its unique ID.
+You can set this ID when creating credential, and set the same ID in job configuration.
+To generate a unique ID, you can use linux command `uuidgen`.
 
 
 This resource manages Jenkins credentials, supporting the following actions:
@@ -497,6 +497,14 @@ node.run_state[:jenkins_private_key] = private_key
 ```
 
 Please note that older versions of Jenkins (< 1.555) permitted login via CLI for a user defined in Jenkins configuration with an SSH public key but not present in the actual SecurityRealm, and this is no longer permitted. If an operation requires any special permission at all, you must authenticate as a real user. This means that if you have LDAP or GitHub OAuth based authn/authz enabled the user you are using for configuraiton tasks must have an associated account in the external services. Please see [JENKINS-22346](https://issues.jenkins-ci.org/browse/JENKINS-22346) for more details.
+
+If (and __only if__) you have your Jenkins instance configured to use the PAM (Unix user/group database) security realm you can set the
+username and password the CLI uses via these two `run_context` values:
+
+```ruby
+node.run_state[:jenkins_username]
+node.run_state[:jenkins_password]
+```
 
 ### Proxies
 If you need to pass through a proxy to communicate between your masters and slaves, you will need to set a special node attribute:

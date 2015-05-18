@@ -23,7 +23,6 @@
 require 'digest'
 
 require_relative '_helper'
-require_relative '_params_validate'
 
 class Chef
   class Resource::JenkinsPlugin < Resource::LWRPBase
@@ -40,18 +39,18 @@ class Chef
 
     # Attributes
     attribute :name,
-      kind_of: String,
-      name_attribute: true
+              kind_of: String,
+              name_attribute: true
     attribute :version,
-      kind_of: [String, Symbol],
-      default: :latest
+              kind_of: [String, Symbol],
+              default: :latest
     attribute :source,
-      kind_of: String
+              kind_of: String
     attribute :install_deps,
-      kind_of: [TrueClass, FalseClass],
-      default: true
+              kind_of: [TrueClass, FalseClass],
+              default: true
     attribute :options,
-      kind_of: String
+              kind_of: String
 
     attr_writer :installed
 
@@ -62,7 +61,7 @@ class Chef
     # @return [Boolean]
     #
     def installed?
-      !!@installed
+      !@installed.nil? && @installed
     end
   end
 end
@@ -138,17 +137,15 @@ EOH
       end
 
       if current_resource.installed?
-        if current_resource.version == new_resource.version ||
-           new_resource.version.to_sym == :latest
-          Chef::Log.debug("#{new_resource} already installed - skipping")
+        if plugin_version(current_resource.version) == desired_version
+          Chef::Log.debug("#{new_resource} version #{current_resource.version} already installed - skipping")
         else
           current_version = plugin_version(current_resource.version)
-          new_version = plugin_version(new_resource.version)
 
-          if current_version < new_version
-            converge_by("Upgrade #{new_resource} from #{current_resource.version} to #{new_resource.version}", &install_block)
+          if current_version < desired_version
+            converge_by("Upgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &install_block)
           else
-            converge_by("Downgrade #{new_resource} from #{current_resource.version} to #{new_resource.version}", &downgrade_block)
+            converge_by("Downgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &downgrade_block)
           end
         end
       else
@@ -238,6 +235,18 @@ EOH
 
     private
 
+    def desired_version(name = nil, version = nil)
+      name = new_resource.name if name.nil?
+      version = new_resource.version if version.nil?
+
+      if version.to_sym == :latest
+        remote_plugin_data = plugin_universe[name]
+        plugin_version(remote_plugin_data['version'])
+      else
+        plugin_version(version)
+      end
+    end
+
     #
     # Installs a plugin along with all of it's dependencies using the
     # update-center.json data.
@@ -248,15 +257,12 @@ EOH
     # @option opts [Boolean] :cli_opts additional flags to pass the jenkins cli command
     # @option opts [Boolean] :install_deps indicates a plugins dependencies should be installed
     #
-    def install_plugin_from_update_center(plugin_name, plugin_version, opts={})
+    def install_plugin_from_update_center(plugin_name, plugin_version, opts = {})
       remote_plugin_data = plugin_universe[plugin_name]
-      local_plugin_data  = plugin_installation_manifest(plugin_name)
 
       # Compute some versions; Parse them as `Gem::Version` instances for easy
       # comparisons.
-      installed_version = local_plugin_data ? plugin_version(local_plugin_data['plugin_version']) : nil
       latest_version    = plugin_version(remote_plugin_data['version'])
-      desired_version   = (plugin_version.to_sym == :latest) ? latest_version : plugin_version(plugin_version)
 
       # Brute-force install all dependencies
       if opts[:install_deps] && remote_plugin_data['dependencies'].any?
@@ -276,9 +282,9 @@ EOH
 
       # Replace the latest version with the desired version in the URL
       source_url = remote_plugin_data['url']
-      source_url.gsub!(latest_version.to_s, desired_version.to_s)
+      source_url.gsub!(latest_version.to_s, desired_version(plugin_name, plugin_version).to_s)
 
-      install_plugin_from_url(source_url, plugin_name, plugin_version, opts)
+      install_plugin_from_url(source_url, plugin_name, desired_version(plugin_name, plugin_version), opts)
     end
 
     #
@@ -291,7 +297,7 @@ EOH
     # @option opts [Boolean] :cli_opts additional flags to pass the jenkins cli command
     # @option opts [Boolean] :install_deps indicates a plugins dependencies should be installed
     #
-    def install_plugin_from_url(source_url, plugin_name, plugin_version=nil, opts={})
+    def install_plugin_from_url(source_url, plugin_name, plugin_version = nil, opts = {})
       version = plugin_version || Digest::MD5.hexdigest(source_url)
 
       # Use the remote_file resource to download and cache the plugin (see
@@ -408,16 +414,14 @@ EOH
     # @return [String]
     #
     def plugin_version(version)
-      begin
-        plugin_version = Gem::Version.new(version)
-      rescue ArgumentError
-        plugin_version = version
-      end
+      Gem::Version.new(version)
+    rescue ArgumentError
+      version
     end
   end
 end
 
 Chef::Platform.set(
   resource: :jenkins_plugin,
-  provider: Chef::Provider::JenkinsPlugin
+  provider: Chef::Provider::JenkinsPlugin,
 )
